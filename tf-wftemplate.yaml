@@ -1,0 +1,133 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: cluster-setup
+  namespace: argo
+spec:
+  entrypoint: Create-Init               # Fields other than "arguments" and "templates" not supported in v2.4 - v2.6
+  volumeClaimTemplates:                 # define volume, same syntax as k8s Pod spec
+  - metadata:
+      name: workdir                     # name of volume claim
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi                  # Gi => 1024 * 1024 * 1024
+
+  templates:
+    - name: Create-Init
+      inputs:
+        parameters:
+          - name: giturl
+          - name: env
+          - name: resources
+          - name: awssecret
+      dag:
+        tasks:
+          # Add step to configure env level variables
+          - name: gitclone
+            template: git-clone
+            arguments:
+              parameters:
+                - name: giturl
+                  value: "{{inputs.parameters.giturl}}"
+          
+          - name: createResources
+            template: create-resources
+            arguments:
+              parameters:
+                - name: env
+                  value: "{{inputs.parameters.env}}"
+                - name: giturl
+                  value: "{{inputs.parameters.giturl}}"  
+                - name: resources
+                  value: "{{inputs.parameters.resources}}"
+                - name: awssecret
+                  value: "{{inputs.parameters.awssecret}}"  
+            dependencies: [gitclone] 
+          
+    ##############   Following templates are used ##############
+    
+    ##############   Git clone and mount it on volume  ##############
+    - name: git-clone
+      inputs:
+        parameters:
+          - name: giturl
+      container:
+        image: alpine/git:latest
+        command: [sh, -c]
+        args: ["cd /mnt/vol && git clone {{inputs.parameters.giturl}}"]
+        volumeMounts:
+          - name: workdir
+            mountPath: /mnt/vol
+    
+    ##############   Creates resource by applying terraform modules ##############
+    - name: resource-create
+      inputs:
+        parameters:
+          - name: env
+          - name: giturl
+          - name: resource
+          - name: awssecret
+      container:
+        image: atharva29/terraimage:0.3.5
+        command: [sh, -c]
+        # apply the bash script and pass env path as argument
+        args: ["gitlink={{inputs.parameters.giturl}}; f=${gitlink##*/}; foldername=${f%.*}; ./xlr8s infra deploy --envpath /mnt/vol/${foldername}/envs/{{inputs.parameters.env}} --resource {{inputs.parameters.resource}};"]
+        volumeMounts:
+          - name: workdir
+            mountPath: /mnt/vol
+        # AWS credentials loaded from k8s secret. Needed to deploy resources on AWS.
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: "{{inputs.parameters.awssecret}}"
+                key: AWS_ACCESS_KEY_ID
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "{{inputs.parameters.awssecret}}"
+                key: AWS_SECRET_ACCESS_KEY 
+             
+    - name: create-resources
+      inputs:
+          parameters:
+            - name: env
+            - name: giturl
+            - name: resources
+            - name: awssecret
+      dag:
+        tasks:
+          - name: resource
+            template: resource-create
+            arguments:
+              parameters:
+              - name: env
+                value: "{{inputs.parameters.env}}"
+              - name: giturl
+                value: "{{inputs.parameters.giturl}}"  
+              - name: resource
+                value: "{{item}}"
+              - name: awssecret
+                value: "{{inputs.parameters.awssecret}}"   
+            withParam: "{{inputs.parameters.resources}}"        
+      
+      
+      ##############   For parallel execution use steps ##############
+      # steps:
+      # - - name: resource
+      #     template: resource-create
+      #     arguments:
+      #       parameters:
+      #       - name: env
+      #         value: "{{inputs.parameters.env}}"
+      #       - name: giturl
+      #         value: "{{inputs.parameters.giturl}}"  
+      #       - name: resource
+      #         value: "{{item}}"
+      #       - name: awssecret
+      #         value: "{{inputs.parameters.awssecret}}"   
+      #     withParam: "{{inputs.parameters.resources}}"
+
+
