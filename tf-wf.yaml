@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: workflow-cluster-setup-
+spec:
+  arguments:
+    parameters:
+    - name: env
+      value: "dev"
+    - name: giturl
+      value: "https://github.com/xi2817-aajgaonkar/terraform-practice.git"
+    - name: awssecret
+      value: "aws-secret"
+    - name: gitsecret
+      value: "git-secret"
+    - name: bucket
+      value: "test-tf-backend"       
+    - name: resources
+      value: |
+         [
+          "dev-eks",
+          "dev-db"
+          ]
+  workflowTemplateRef:
+    name: cluster-setup
