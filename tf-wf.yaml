@@ -14,7 +14,9 @@ spec:
     - name: gitsecret
       value: "git-secret"
     - name: bucket
-      value: "test-tf-backend"       
+      value: "test-tf-backend"
+    - name: tfoperation
+      value: "create"         
     - name: resources
       value: |
          [

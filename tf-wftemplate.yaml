@@ -18,10 +18,12 @@ spec:
     - name: Create-Init
       inputs:
         parameters:
-          - name: giturl
           - name: env
-          - name: resources
+          - name: giturl
           - name: awssecret
+          - name: bucket
+          - name: tfoperation
+          - name: resources
       dag:
         tasks:
           # Add step to configure env level variables
@@ -44,6 +46,10 @@ spec:
                   value: "{{inputs.parameters.resources}}"
                 - name: awssecret
                   value: "{{inputs.parameters.awssecret}}"  
+                - name: bucket
+                  value: "{{inputs.parameters.bucket}}"  
+                - name: tfoperation
+                  value: "{{inputs.parameters.tfoperation}}"      
             dependencies: [gitclone] 
           
     ##############   Following templates are used ##############
@@ -69,11 +75,13 @@ spec:
           - name: giturl
           - name: resource
           - name: awssecret
+          - name: bucket
+          - name: tfoperation
       container:
         image: atharva29/terraimage:0.3.5
         command: [sh, -c]
         # apply the bash script and pass env path as argument
-        args: ["gitlink={{inputs.parameters.giturl}}; f=${gitlink##*/}; foldername=${f%.*}; ./xlr8s infra deploy --envpath /mnt/vol/${foldername}/envs/{{inputs.parameters.env}} --resource {{inputs.parameters.resource}};"]
+        args: ["gitlink={{inputs.parameters.giturl}}; f=${gitlink##*/}; foldername=${f%.*}; ./xlr8s infra deploy --envpath /mnt/vol/${foldername}/envs/{{inputs.parameters.env}} --resource {{inputs.parameters.resource}} --bucket {{inputs.parameters.bucket}} --tfoperation {{inputs.parameters.tfoperation}};"]
         volumeMounts:
           - name: workdir
             mountPath: /mnt/vol
@@ -97,6 +105,8 @@ spec:
             - name: giturl
             - name: resources
             - name: awssecret
+            - name: bucket
+            - name: tfoperation
       dag:
         tasks:
           - name: resource
@@ -110,7 +120,11 @@ spec:
               - name: resource
                 value: "{{item}}"
               - name: awssecret
-                value: "{{inputs.parameters.awssecret}}"   
+                value: "{{inputs.parameters.awssecret}}"
+              - name: bucket
+                value: "{{inputs.parameters.bucket}}"  
+              - name: tfoperation
+                value: "{{inputs.parameters.tfoperation}}"      
             withParam: "{{inputs.parameters.resources}}"        
       
       
