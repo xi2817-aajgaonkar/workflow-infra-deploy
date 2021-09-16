@@ -12,7 +12,7 @@ spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
         requests:
-          storage: 1Gi                  # Gi => 1024 * 1024 * 1024
+          storage: 1Gi
 
   templates:
     - name: Create-Init
@@ -68,7 +68,7 @@ spec:
             mountPath: /mnt/vol
     
     ##############   Creates resource by applying terraform modules ##############
-    - name: resource-create
+    - name: resource-operation
       inputs:
         parameters:
           - name: env
@@ -110,7 +110,7 @@ spec:
       dag:
         tasks:
           - name: resource
-            template: resource-create
+            template: resource-operation
             arguments:
               parameters:
               - name: env
@@ -131,7 +131,7 @@ spec:
       ##############   For parallel execution use steps ##############
       # steps:
       # - - name: resource
-      #     template: resource-create
+      #     template: resource-operation
       #     arguments:
       #       parameters:
       #       - name: env
